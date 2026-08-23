@@ -1,0 +1,145 @@
+{
+  "reproducible_seed": 42,
+  "total_failed_payments": 500.0,
+  "baseline": {
+    "recovered_count": 100,
+    "recovery_rate_pct": 20.0,
+    "gross_revenue": 18025.8,
+    "action_costs": 0.0,
+    "net_revenue": 18025.8
+  },
+  "agent": {
+    "recovered_count": 248,
+    "recovery_rate_pct": 49.6,
+    "gross_revenue": 39833.16,
+    "action_costs": 396.05,
+    "net_revenue": 39437.11
+  },
+  "financial_uplift": {
+    "recovery_rate_uplift_pp": 29.6,
+    "net_revenue_uplift": 21411.31,
+    "pct_net_improvement": 118.8
+  },
+  "breakdown_by_failure_reason": [
+    {
+      "failure_reason": "card_declined_fraud_check",
+      "total": 107,
+      "baseline_recovered": 12,
+      "agent_recovered": 53,
+      "baseline_net_revenue": 1834.18,
+      "agent_net_revenue": 5992.48,
+      "total_agent_costs": 395.0,
+      "baseline_rate": 11.2,
+      "agent_rate": 49.5,
+      "uplift_net_revenue": 4158.3
+    },
+    {
+      "failure_reason": "card_expired",
+      "total": 111,
+      "baseline_recovered": 25,
+      "agent_recovered": 80,
+      "baseline_net_revenue": 5514.78,
+      "agent_net_revenue": 15573.47,
+      "total_agent_costs": 1.05,
+      "baseline_rate": 22.5,
+      "agent_rate": 72.1,
+      "uplift_net_revenue": 10058.69
+    },
+    {
+      "failure_reason": "insufficient_funds",
+      "total": 168,
+      "baseline_recovered": 16,
+      "agent_recovered": 37,
+      "baseline_net_revenue": 2191.37,
+      "agent_net_revenue": 4079.34,
+      "total_agent_costs": 0.0,
+      "baseline_rate": 9.5,
+      "agent_rate": 22.0,
+      "uplift_net_revenue": 1887.97
+    },
+    {
+      "failure_reason": "network_timeout",
+      "total": 114,
+      "baseline_recovered": 47,
+      "agent_recovered": 78,
+      "baseline_net_revenue": 8485.47,
+      "agent_net_revenue": 13791.82,
+      "total_agent_costs": 0.0,
+      "baseline_rate": 41.2,
+      "agent_rate": 68.4,
+      "uplift_net_revenue": 5306.35
+    }
+  ],
+  "breakdown_by_customer_segment": [
+    {
+      "customer_segment": "churning",
+      "total": 89,
+      "baseline_recovered": 3,
+      "agent_recovered": 23,
+      "baseline_net_revenue": 62.78,
+      "agent_net_revenue": 1108.06,
+      "baseline_rate": 3.4,
+      "agent_rate": 25.8,
+      "uplift_net_revenue": 1045.28
+    },
+    {
+      "customer_segment": "loyal_high_value",
+      "total": 131,
+      "baseline_recovered": 46,
+      "agent_recovered": 93,
+      "baseline_net_revenue": 13146.039999999999,
+      "agent_net_revenue": 25445.65,
+      "baseline_rate": 35.1,
+      "agent_rate": 71.0,
+      "uplift_net_revenue": 12299.61
+    },
+    {
+      "customer_segment": "mid_tier_stable",
+      "total": 158,
+      "baseline_recovered": 33,
+      "agent_recovered": 87,
+      "baseline_net_revenue": 3861.67,
+      "agent_net_revenue": 10123.09,
+      "baseline_rate": 20.9,
+      "agent_rate": 55.1,
+      "uplift_net_revenue": 6261.42
+    },
+    {
+      "customer_segment": "new_uncertain",
+      "total": 122,
+      "baseline_recovered": 18,
+      "agent_recovered": 45,
+      "baseline_net_revenue": 955.31,
+      "agent_net_revenue": 2760.31,
+      "baseline_rate": 14.8,
+      "agent_rate": 36.9,
+      "uplift_net_revenue": 1805.0
+    }
+  ],
+  "action_distribution": [
+    {
+      "action": "retry_in_3_days",
+      "count": 199
+    },
+    {
+      "action": "retry_immediately",
+      "count": 106
+    },
+    {
+      "action": "send_payment_update_email",
+      "count": 105
+    },
+    {
+      "action": "escalate_to_human_review",
+      "count": 79
+    },
+    {
+      "action": "do_not_pursue",
+      "count": 11
+    }
+  ],
+  "audit_log_sources": {
+    "cache": 500,
+    "rule_based_baseline": 500
+  }
+}
