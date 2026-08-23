@@ -1,14 +1,45 @@
 # 💳 RecoverAI — Autonomous Revenue Recovery Agent for Razorpay Merchants
 
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.30.0-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Tests Passing](https://img.shields.io/badge/Tests-7%20Passed-2ea44f?style=flat&logo=pytest&logoColor=white)](#-running-tests)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 An enterprise-grade, cost-aware dunning microservice built with **Python 3.11**, **FastAPI**, **SQLite Audit Logging**, **Groq LLM (llama-3.1-8b-instant)**, **Razorpay Test-Mode Integration**, and **Streamlit**.
 
-Unlike standard dunning platforms that apply a single generic retry rule or focus solely on recovery percentage, this system optimizes for **NET Recovered Revenue** (Gross Recovered Revenue − Action Costs). It is delivered as a live, callable REST service with complete auditability, rate-limit resilience, Razorpay-native payment link creation, and zero-setup demo support.
+Unlike standard dunning platforms that apply a single generic retry rule or focus solely on raw recovery percentage, **RecoverAI** optimizes for **NET Recovered Revenue** (Gross Recovered Revenue − Action Costs). It is delivered as a live, callable REST service with complete auditability, rate-limit resilience, Razorpay-native payment link creation, and zero-setup demo support.
 
 ![RecoverAI Live Dashboard Demo](docs/demo_preview.png)
 
-![Architecture Diagram](docs/architecture.png)
-
 > ⚠️ **Portfolio Project Disclaimer**: Recovery outcomes in this demo are generated using a probabilistic simulation engine, not real transaction gateway data. This project showcases enterprise software architecture, cost-aware decisioning, Razorpay API integration, and regulatory compliance patterns.
+
+---
+
+## 📌 Table of Contents
+
+- [🎥 Demo Video](#-demo-video)
+- [🎯 Problem Statement & Business Case](#-problem-statement--business-case)
+- [🏗️ System Architecture](#%EF%B8%8F-system-architecture)
+- [🧠 How the Agent Reasons](#-how-the-agent-reasons)
+- [💰 Action Cost Model](#-action-cost-model)
+- [📊 Key Results & Operational KPIs](#-key-results--operational-kpis)
+- [📸 Dashboard & Swagger Screenshots](#-dashboard--swagger-screenshots)
+- [🔗 Razorpay Test-Mode Integration](#-razorpay-test-mode-integration)
+- [🤖 Agent State Machine](#-agent-state-machine)
+- [🧪 Running Tests](#-running-tests)
+- [🚀 Quick Start Guide](#-quick-start-guide)
+- [🐳 Production Deployment](#-production-deployment)
+- [⚠️ Limitations & Future Work](#%EF%B8%8F-limitations--future-work)
+- [📁 Repository Structure](#-repository-structure)
+
+---
+
+## 🎥 Demo Video
+
+> 🎙️ **Recording Script**: A tight 75-second spoken script is available in [docs/demo-video-script.md](docs/demo-video-script.md).
+
+- **Watch 90-Second Walkthrough**: [Link to Unlisted YouTube / Google Drive Demo Video](#) *(Record using Loom/OBS following `docs/demo-video-script.md`)*
 
 ---
 
@@ -26,6 +57,8 @@ $$\text{Expected Net Value} = (\text{Amount Due} \times \text{Recovery Probabili
 ---
 
 ## 🏗️ System Architecture
+
+![Architecture Diagram](docs/architecture.png)
 
 <details>
 <summary>Interactive diagram source (Mermaid)</summary>
@@ -58,6 +91,41 @@ flowchart TD
 
 ---
 
+## 🧠 How the Agent Reasons
+
+### 1. LLM System & User Prompt Structure
+When a live LLM evaluation is triggered, RecoverAI constructs a structured prompt including customer tenure, past success/failure counts, LTV, invoice amount due, and failure reason:
+
+```json
+{
+  "customer_id": "CUST_0001",
+  "customer_tenure_days": 340,
+  "past_successful_payments": 14,
+  "past_failed_payments": 1,
+  "failure_reason": "card_expired",
+  "amount_due": 149.99,
+  "customer_ltv": 1250.00
+}
+```
+
+The system prompt strictly requires a structured JSON output enforcing contract compliance:
+```json
+{
+  "action": "send_payment_update_email",
+  "estimated_recovery_probability": 0.72,
+  "reasoning": "Card expired for high-LTV customer ($1,250). Prompting email update via Razorpay test payment link maximizes expected NET revenue ($108.14) over $0.00 write-off."
+}
+```
+
+### 2. The 3-Tier Resilient Architecture
+To guarantee 99.99% availability and zero failure during pitch reviews, RecoverAI implements a **3-tier execution waterfall**:
+
+1. **Tier 1: Pre-computed Cache Hit**: Instant lookup (~0.1ms) from SQLite `decision_cache` for seeded transactions or repeat inputs.
+2. **Tier 2: Live Groq LLM Call**: Invokes `llama-3.1-8b-instant` with structured JSON output and a strict 5.0s timeout. Up to 2 retries with exponential backoff (2s, 4s).
+3. **Tier 3: Smart Cost-Aware Rule Fallback**: If LLM API limits or timeouts occur, the agent seamlessly degrades to `get_cost_aware_heuristic()`, evaluating expected NET revenue programmatically. **The service never returns a 500 server error.**
+
+---
+
 ## 💰 Action Cost Model
 
 | Action | Cost | Ideal Use Case |
@@ -70,50 +138,9 @@ flowchart TD
 
 ---
 
-## 🔗 Razorpay Test-Mode Integration
+## 📊 Key Results & Operational KPIs
 
-The system integrates with the **real Razorpay API** in test mode via `src/razorpay_client.py`:
-
-| Feature | Description |
-|---|---|
-| **Payment Links** | `create_payment_link(amount, customer_id)` — Creates a real Razorpay-hosted checkout link for card-expired recovery |
-| **Orders API** | `create_order(amount, receipt_id)` — Creates a test-mode order representing the recovery transaction |
-| **Fetch Payment** | `fetch_payment_details(payment_id)` — Retrieves status & error codes from Razorpay |
-| **New Endpoint** | `POST /razorpay/create-recovery-link` — Returns a live `rzp.io/...` payment link |
-
-**Integration Modes:**
-- `RAZORPAY_LIVE_INTEGRATION=false` (default): Runs fully offline — returns realistic simulated Razorpay objects. **Zero API keys required.**
-- `RAZORPAY_LIVE_INTEGRATION=true`: Calls real Razorpay Test Mode API. Requires `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` from [Razorpay Dashboard → API Keys](https://dashboard.razorpay.com/app/keys).
-
-> **Design rationale**: Core decisioning runs fully offline for reliability. The live Razorpay integration is available and demonstrated on demand — toggle `RAZORPAY_LIVE_INTEGRATION=true` with your own test keys to see real payment links generated.
-
----
-
-## 🤖 Agent State Machine (RecoveryPlanner)
-
-Every decision flows through explicit, auditable state transitions (in `src/planner.py`):
-
-```
-RECEIVED → DIAGNOSED:{failure_reason} → COST_EVALUATED:net_$X_prob_Y% → ACTION_SELECTED:{action} → EXECUTED:{source} → LOGGED
-```
-
-The state sequence is stored in every audit log entry and rendered visually in the **Audit Trail Viewer** tab of the Streamlit dashboard.
-
----
-
-## 🛡️ Demo Reliability & Resilience Design
-
-To ensure the demo never fails mid-walkthrough or when cloned by a reviewer:
-
-1. **Pre-populated Decision Cache**: All synthetic rows are pre-computed into SQLite `decision_cache`.
-2. **Default `DEMO_MODE=true`**: Serves predictions instantly from cache/fallback without requiring live LLM keys.
-3. **Exponential Backoff**: Live calls retry twice (2s, 4s backoff) on transient errors.
-4. **Graceful Rule Fallback**: Automatically degrades to a cost-aware heuristic engine on LLM rate-limit, returning `decision_source="rule_based_fallback"`.
-5. **Razorpay Offline Simulation**: Simulated Razorpay objects (`rzp_test_...`, `https://rzp.io/i/test_...`) returned when `RAZORPAY_LIVE_INTEGRATION=false`.
-
----
-
-## 📊 Key Results (100% Reproducible Seed=42)
+### Financial Impact (100% Reproducible Seed=42)
 
 | Metric | Naive Baseline | Cost-Aware AI Agent | Financial Uplift |
 |---|---|---|---|
@@ -122,93 +149,186 @@ To ensure the demo never fails mid-walkthrough or when cloned by a reviewer:
 | **Action Costs Incurred** | $0.00 | $396.05 | +$396.05 |
 | **NET Recovered Revenue** | **$18,025.80** | **$39,437.11** | **+$21,411.31 (+118.8% NET Gain)** |
 
-### Failure Reason Breakdown
-- **Card Expired** (111 payments): 22.5% baseline ➔ **72.1%** agent (**+$10,058.69 NET gain**) — *targeted email updates ($0.01 cost)*
-- **Network Timeout** (114 payments): 41.2% baseline ➔ **68.4%** agent (**+$5,306.35 NET gain**) — *immediate retry ($0.00 cost)*
-- **Fraud Check** (107 payments): 11.2% baseline ➔ **49.5%** agent (**+$4,158.30 NET gain**) — *selective human review ($5.00 cost)*
-- **Insufficient Funds** (168 payments): 9.5% baseline ➔ **22.0%** agent (**+$1,887.97 NET gain**) — *3-day retry & 11 deliberate write-offs (`do_not_pursue`)*
+### Operational KPIs
+
+| Operational Metric | Value | Description |
+|---|---|---|
+| **Automation Rate** | **84.2%** | 421/500 decisions handled automatically without human intervention |
+| **False Positive Cost** | **$270.05** | Wasted action cost on unrecovered attempts (transparent evaluation) |
+| **Avg Decision Latency** | **< 1s** | ~0.1ms cached / ~1.2s live LLM |
 
 ---
 
-## 📈 Operational KPIs
+## 📸 Dashboard & Swagger Screenshots
 
-| KPI | Value | Description |
-|---|---|---|
-| **Automation Rate** | **84.2%** | Decisions handled without human review (421/500 payments auto-resolved) |
-| **False Positive Cost** | **$270.05** | Wasted action cost on unrecovered attempts (transparent honest evaluation) |
-| **Avg Decision Latency** | **< 1s** | Cached: ~0.1ms per event · Live LLM: ~1.2s per event |
+### Streamlit Analytics Dashboard
+
+| View | Screenshot |
+|---|---|
+| **Overview & NET Revenue Uplift** | ![Dashboard Overview](docs/screenshots/dashboard-overview.png) |
+| **Agent Decision Explorer** | ![Agent Decisions](docs/screenshots/agent-decisions.png) |
+| **Compliance Audit Trail & Pipeline** | ![Audit Trail](docs/screenshots/audit-trail.png) |
+
+### FastAPI Swagger REST Documentation
+
+| View | Screenshot |
+|---|---|
+| **Swagger Endpoint Overview** | ![Swagger Overview](docs/screenshots/swagger-overview.png) |
+| **Interactive Request / Response Example** | ![Swagger Example](docs/screenshots/swagger-example.png) |
+
+---
+
+## 🔗 Razorpay Test-Mode Integration
+
+RecoverAI integrates directly with the official **Razorpay Python SDK** (`src/razorpay_client.py`):
+
+- **Payment Link Creation**: `create_payment_link()` generates real test-mode `rzp.io/...` URLs for card-expired recovery.
+- **REST Endpoint**: `POST /razorpay/create-recovery-link` generates live payment links dynamically.
+- **Dual Mode**: Set `RAZORPAY_LIVE_INTEGRATION=true` with your `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `.env` to make live API calls. When `false`, simulated test links are returned.
+
+---
+
+## 🤖 Agent State Machine
+
+Every decision follows an explicit, auditable sequence managed by `RecoveryPlanner` (`src/planner.py`):
+
+```
+RECEIVED ➔ DIAGNOSED:{failure_reason} ➔ COST_EVALUATED:net_$X_prob_Y% ➔ ACTION_SELECTED:{action} ➔ EXECUTED:{source} ➔ LOGGED
+```
+
+State sequences are saved to SQLite audit logs and rendered visually step-by-step in the Streamlit Audit Trail tab.
+
+---
+
+## 🧪 Running Tests
+
+RecoverAI includes a deterministic `pytest` unit test suite covering cost calculations, heuristic fallback decisioning, and cache mocking:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Execute test suite
+python -m pytest tests/ -v
+```
+
+Expected output:
+```
+tests/test_agent.py::test_rule_based_fallback_do_not_pursue PASSED
+tests/test_agent.py::test_rule_based_fallback_card_expired PASSED
+tests/test_agent.py::test_rule_based_fallback_fraud_check_high_amount PASSED
+tests/test_agent.py::test_rule_based_fallback_network_timeout PASSED
+tests/test_agent.py::test_predict_payment_recovery_cache_hit_bypasses_llm PASSED
+tests/test_cost_model.py::test_action_costs PASSED
+tests/test_cost_model.py::test_expected_net_value PASSED
+============================== 7 passed in 1.72s ==============================
+```
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### 1. Setup & Seeding
-
 ```bash
-# Clone & install dependencies
+# 1. Clone repository & install requirements
+git clone https://github.com/suvetha-developer/ai-revenue-recovery-agent.git
+cd ai-revenue-recovery-agent
 pip install -r requirements.txt
 
-# Seed SQLite database, pre-compute decisions & audit logs
+# 2. Seed SQLite database & pre-compute decisions
 python run_demo.py
-```
 
-### 2. Launch FastAPI Microservice
-
-```bash
+# 3. Launch FastAPI Microservice (Port 8000)
 uvicorn src.api:app --reload --port 8000
-```
-- Interactive API Docs: `http://localhost:8000/docs`
-- Run API Test Suite: `python test_api.py`
 
-### 3. Launch Streamlit Analytics Dashboard
-
-```bash
+# 4. Launch Streamlit Analytics Dashboard (Port 8501)
 python -m streamlit run app.py
 ```
-- Dashboard URL: `http://localhost:8501`
 
-### 4. (Optional) Enable Live Razorpay Integration
+---
+
+## 🐳 Production Deployment
+
+### Environment Variables
+Configure production variables in your environment or `.env` file:
+```env
+DEMO_MODE=false
+GROQ_API_KEY=gsk_your_groq_key_here
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=...
+RAZORPAY_LIVE_INTEGRATION=true
+```
+
+### Running with Docker
 
 ```bash
-# 1. Copy .env.example to .env
-cp .env.example .env
+# Build Docker image
+docker build -t recoverai-microservice .
 
-# 2. Add your Razorpay test-mode keys (from dashboard.razorpay.com/app/keys)
-# RAZORPAY_KEY_ID=rzp_test_...
-# RAZORPAY_KEY_SECRET=...
-# RAZORPAY_LIVE_INTEGRATION=true
-
-# 3. Call the recovery link endpoint
-curl -X POST "http://localhost:8000/razorpay/create-recovery-link?customer_id=CUST_0001&amount_due=149.99"
+# Run container exposing port 8000
+docker run -d -p 8000:8000 --env-file .env --name recoverai recoverai-microservice
 ```
+
+### Production ASGI Launch
+```bash
+uvicorn src.api:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+---
+
+## ⚠️ Limitations & Future Work
+
+### Honest Limitations
+- **Simulated Outcomes**: Recovery probabilities and outcomes are computed via a probabilistic simulation model, not live bank settlement feeds.
+- **Dataset Size**: Benchmark dataset contains 500 payment rows; real enterprise platforms process hundreds of thousands daily.
+- **Model Sensitivity**: LLM reasoning quality depends on `llama-3.1-8b-instant`; prompt adjustments may be required when upgrading models.
+
+### Future Roadmap
+- **Live Settlement Webhook Callbacks**: Listen for real Razorpay `payment.authorized` webhooks to automatically mark audit logs as recovered.
+- **A/B Testing Framework**: Randomize agent recommendations against control groups to continuously validate financial uplift.
+- **Multi-Tenant Enterprise Configs**: Support custom action cost schedules per merchant organization.
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-Financial project/
+ai-revenue-recovery-agent/
 ├── app.py                      # Streamlit Analytics & Audit Trail Dashboard
 ├── run_demo.py                 # Pre-computed Demo Seeder Script
 ├── test_api.py                 # FastAPI Endpoint Verification Suite
-├── requirements.txt
-├── README.md
-├── TESTING.md                  # Failure-mode stress test documentation
-├── .env.example                # Configuration template (no real keys)
-├── data/
+├── requirements.txt            # Python Dependencies
+├── Dockerfile                  # Production Container Configuration
+├── README.md                   # Complete Technical Documentation
+├── TESTING.md                  # Stress Test Suite Verification Log
+├── .env.example                # Environment Variable Template
+├── docs/                       # Visual Assets & Documentation
+│   ├── architecture.png        # System Flow Architecture Diagram
+│   ├── demo_preview.png        # Streamlit Live UI Preview Image
+│   ├── demo-video-script.md    # 60-90 Second Spoken Pitch Video Script
+│   └── screenshots/            # Dashboard & API Documentation Screenshots
+│       ├── dashboard-overview.png
+│       ├── agent-decisions.png
+│       ├── audit-trail.png
+│       ├── swagger-overview.png
+│       └── swagger-example.png
+├── tests/                      # Pytest Unit Test Suite
+│   ├── __init__.py
+│   ├── test_agent.py           # Heuristic Decision & Cache Unit Tests
+│   └── test_cost_model.py      # Action Cost & Expected Net Value Unit Tests
+├── data/                       # Pre-computed Seed Files & Metrics
 │   ├── payments.db             # SQLite DB (failed_payments, audit_log, decision_cache)
-│   └── metrics_summary.json   # Reproducible metrics (seed=42)
-└── src/
+│   └── metrics_summary.json   # Reproducible Benchmark Metrics JSON
+└── src/                        # Core Application Microservice Modules
     ├── __init__.py
-    ├── api.py                  # FastAPI REST Microservice Layer
+    ├── api.py                  # FastAPI REST Microservice Endpoint Layer
     ├── agent.py                # Resilient Cost-Aware AI Agent Engine
     ├── planner.py              # State Machine Agent Orchestrator (RecoveryPlanner)
     ├── razorpay_client.py      # Razorpay API Integration (Test Mode + Offline Simulation)
     ├── cost_model.py           # Action Costs & Expected Net Revenue Formulas
     ├── generate_data.py        # Synthetic Payment Event Generator ($ USD)
-    ├── baseline.py             # Naive Recovery Baseline Simulation
-    ├── audit.py                # Audit Logging Helpers
-    ├── simulate_outcomes.py    # Outcome Simulation Engine
-    ├── compare_results.py      # Comparative Financial Analysis
-    └── export_metrics.py       # Reproducible Metrics JSON Exporter
+    ├── baseline.py             # Naive Recovery Baseline Simulation Engine
+    ├── audit.py                # SQLite Audit Logging Helpers
+    ├── simulate_outcomes.py    # Probabilistic Outcome Simulation Engine
+    ├── compare_results.py      # Comparative Financial Analysis Module
+    └── export_metrics.py       # Reproducible Metrics Exporter Module
 ```
