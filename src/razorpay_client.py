@@ -11,6 +11,12 @@ import hashlib
 from typing import Dict, Any, Optional
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
     import razorpay
     HAS_RAZORPAY_SDK = True
 except ImportError:
