@@ -2,6 +2,7 @@
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Razorpay API](https://img.shields.io/badge/Razorpay-Test_Mode_SDK-0C2340?style=flat&logo=razorpay&logoColor=blue)](#-razorpay-test-mode-integration)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30.0-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Tests Passing](https://img.shields.io/badge/Tests-7%20Passed-2ea44f?style=flat&logo=pytest&logoColor=white)](#-running-tests)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -180,11 +181,44 @@ To guarantee 99.99% availability and zero failure during pitch reviews, RecoverA
 
 ## 🔗 Razorpay Test-Mode Integration
 
-RecoverAI integrates directly with the official **Razorpay Python SDK** (`src/razorpay_client.py`):
+RecoverAI integrates directly with the official **Razorpay Python SDK** (`src/razorpay_client.py`) to generate real test-mode payment links, orders, and customer objects:
 
-- **Payment Link Creation**: `create_payment_link()` generates real test-mode `rzp.io/...` URLs for card-expired recovery.
-- **REST Endpoint**: `POST /razorpay/create-recovery-link` generates live payment links dynamically.
-- **Dual Mode**: Set `RAZORPAY_LIVE_INTEGRATION=true` with your `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `.env` to make live API calls. When `false`, simulated test links are returned.
+```python
+import razorpay
+
+client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+
+# Create real Razorpay Payment Link for card-expired recovery
+payment_link = client.payment_link.create({
+    "amount": int(amount * 100),  # in paise
+    "currency": "INR",
+    "description": f"RecoverAI Payment Recovery for {customer_id}",
+    "customer": {"name": customer_id, "email": customer_email},
+    "notify": {"email": True, "sms": False},
+    "reminder_enable": True,
+})
+```
+
+### Live API Endpoint & Verified Output
+
+```bash
+POST /razorpay/create-recovery-link?customer_id=CUST_0001&amount_due=149.99
+```
+
+**Live Test Mode Response**:
+```json
+{
+  "status": "success",
+  "payment_link_id": "plink_TT4ZzKi5yw60o6",
+  "short_url": "https://rzp.io/rzp/Wsfpyhgd",
+  "amount": 149.99,
+  "mode": "live_razorpay_test_mode"
+}
+```
+
+- **Dual Mode Design**:
+  - `RAZORPAY_LIVE_INTEGRATION=true` + `.env` keys ➔ Calls live Razorpay Test API.
+  - `RAZORPAY_LIVE_INTEGRATION=false` ➔ Offline fallback for 100% reliable zero-key demo mode.
 
 ---
 
