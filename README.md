@@ -4,6 +4,8 @@ An enterprise-grade, cost-aware dunning microservice built with **Python 3.11**,
 
 Unlike standard dunning platforms that apply a single generic retry rule or focus solely on recovery percentage, this system optimizes for **NET Recovered Revenue** (Gross Recovered Revenue − Action Costs). It is delivered as a live, callable REST service with complete auditability, rate-limit resilience, Razorpay-native payment link creation, and zero-setup demo support.
 
+![RecoverAI Live Dashboard Demo](docs/demo_preview.png)
+
 ![Architecture Diagram](docs/architecture.png)
 
 > ⚠️ **Portfolio Project Disclaimer**: Recovery outcomes in this demo are generated using a probabilistic simulation engine, not real transaction gateway data. This project showcases enterprise software architecture, cost-aware decisioning, Razorpay API integration, and regulatory compliance patterns.
