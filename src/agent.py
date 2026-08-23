@@ -7,6 +7,7 @@ Objective: Maximize NET Recovered Revenue = (amount_due * recovery_prob) - actio
 """
 
 import hashlib
+import hashlib
 import json
 import os
 import sqlite3
@@ -14,6 +15,8 @@ import time
 import pandas as pd
 from dotenv import load_dotenv
 from src.cost_model import ACTION_COSTS, calculate_expected_net_value
+from src.planner import RecoveryPlanner
+from src.razorpay_client import create_payment_link
 
 load_dotenv()
 
@@ -273,29 +276,46 @@ Respond with your JSON decision."""
 # ---------------------------------------------------------------------------
 def predict_payment_recovery(row: pd.Series, force_live: bool = False, db_path: str = DB_PATH) -> dict:
     """
-    Main entry point for payment recovery prediction.
-    1. Check cache using feature hash
-    2. Check DEMO_MODE flag
-    3. Call live LLM (or fallback) if forced/cache-miss
+    Main entry point for agent prediction.
+    Executes explicit state machine planning, cost evaluation, and optional Razorpay link creation.
     """
+    planner = RecoveryPlanner(row.to_dict())
+    planner.diagnose(row["failure_reason"])
+
     demo_mode = os.environ.get("DEMO_MODE", "true").lower() == "true"
     f_hash = compute_feature_hash(row)
 
     # 1. Cache lookup
     cached = get_cached_decision(f_hash, db_path)
     if cached and not force_live:
-        return cached
+        decision = dict(cached)
+    elif demo_mode and not force_live:
+        # 2. DEMO_MODE enforcement
+        decision = get_cost_aware_heuristic(row)
+        decision["decision_source"] = "cache"
+        save_cached_decision(f_hash, row["customer_id"], decision, "cache", db_path)
+    else:
+        # 3. Live LLM execution
+        decision = call_llm_with_resilience(row)
+        save_cached_decision(f_hash, row["customer_id"], decision, decision.get("decision_source", "llm"), db_path)
 
-    # 2. DEMO_MODE enforcement
-    if demo_mode and not force_live:
-        heuristic = get_cost_aware_heuristic(row)
-        heuristic["decision_source"] = "cache"
-        save_cached_decision(f_hash, row["customer_id"], heuristic, "cache", db_path)
-        return heuristic
+    act = decision["action"]
+    prob = decision.get("estimated_recovery_probability", 0.5)
+    net_val = calculate_expected_net_value(row["amount_due"], prob, act)
 
-    # 3. Live LLM execution
-    decision = call_llm_with_resilience(row)
-    save_cached_decision(f_hash, row["customer_id"], decision, decision.get("decision_source", "llm"), db_path)
+    planner.evaluate_cost_tradeoff(net_val, prob)
+    planner.select_action(act)
+    planner.execute(decision.get("decision_source", "cache"))
+    planner.complete()
+
+    decision["state_sequence"] = planner.get_sequence()
+
+    # Create Razorpay Payment Link for email prompt action
+    if act == "send_payment_update_email":
+        rzp_res = create_payment_link(row["amount_due"], row["customer_id"])
+        decision["payment_link_url"] = rzp_res.get("short_url")
+        decision["payment_link_id"] = rzp_res.get("payment_link_id")
+
     return decision
 
 

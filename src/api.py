@@ -17,15 +17,15 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
 from src.agent import predict_payment_recovery
-from src.cost_model import get_action_cost, calculate_expected_net_value
-from src.audit import log_decision, get_audit_trail_for_customer, init_audit_log
-from src.compare_results import run_comparison
+from src.audit import get_audit_trail_for_customer, log_decision
+from src.cost_model import calculate_expected_net_value, get_action_cost
+from src.razorpay_client import create_payment_link
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "payments.db")
 
 app = FastAPI(
-    title="AI Payment Recovery Agent API",
-    description="Cost-aware automated dunning decision service with full decision audit trail.",
+    title="RecoverAI — Autonomous Revenue Recovery Microservice (Razorpay-Native)",
+    description="Cost-aware Dunning Automation Engine optimizing NET Recovered Revenue for Razorpay Merchants.",
     version="2.0.0",
 )
 
@@ -162,6 +162,24 @@ def get_customer_audit_trail(customer_id: str = Path(..., example="CUST_0102")):
         "total_records": len(df),
         "audit_history": df.to_dict(orient="records"),
     }
+
+
+@app.post("/razorpay/create-recovery-link")
+def create_razorpay_recovery_link(customer_id: str, amount_due: Optional[float] = 149.99):
+    """
+    Create a Razorpay Test Mode Payment Link for a customer recovery workflow.
+    Uses real Razorpay SDK when RAZORPAY_LIVE_INTEGRATION=true or simulated link in DEMO_MODE.
+    """
+    res = create_payment_link(amount=amount_due or 149.99, customer_id=customer_id)
+    return {
+        "status": "success",
+        "customer_id": customer_id,
+        "amount_due": amount_due,
+        "payment_link_id": res.get("payment_link_id"),
+        "payment_link_url": res.get("short_url"),
+        "mode": res.get("mode"),
+    }
+
 
 
 

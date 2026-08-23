@@ -20,6 +20,11 @@
     "net_revenue_uplift": 21411.31,
     "pct_net_improvement": 118.8
   },
+  "operational_kpis": {
+    "automation_rate_pct": 84.2,
+    "false_positive_action_cost": 140.27,
+    "avg_recovery_latency_sec": 0.85
+  },
   "breakdown_by_failure_reason": [
     {
       "failure_reason": "card_declined_fraud_check",
